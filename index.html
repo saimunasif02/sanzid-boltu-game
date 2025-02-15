@@ -1,38 +1,186 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset= "UTF-8">
-    <meta name="viewport"
-content="width=device-width, initial-
-scale=1.0">
-    <title>Sanzid Boltu</title>
-    <link rel="stylesheet"
-href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="https://github.com/AkramHossain0/data/blob/main/c1.png?raw=true">
+  <title>SanzidBoltu | Shooting Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes flash {
+      0%, 100% { filter: none; }
+      50% { filter: brightness(2) saturate(2); }
+    }
+    .character-flash {
+      animation: flash 0.2s;
+    }
+  </style>
 </head>
-<body>
-    <div class="game-container"> 
-         <h1>Sanzid Boltu</h1>
-         <p>Type the word before time runs
-out!</p>
-         <h2 id= "word-display"></h2>
-         <input type="text" id="word-input"
-placeholder="Start typing... 
-autocomplete="off">
-        <p>Score: <span id="score">0</
-span></p>
-        <p>Time Left: <span id="time">10</ 
-span> seconds</p>
-        <button id="restart-btn">Restart</
-button>
+<body class="h-screen w-screen overflow-hidden bg-cover bg-center" style="background-image: url('https://github.com/AkramHossain0/data/blob/main/bgis.JPG?raw=true');">
+  <div id="game-container" class="relative h-full w-full">
+    <div id="score" class="absolute top-4 left-4 text-white text-2xl font-bold">Score: 0</div>
+    <div id="timer" class="absolute top-4 right-4 text-white text-2xl font-bold">Time: 60s</div>
+    <img id="character" src="https://github.com/AkramHossain0/data/blob/main/c1.png?raw=true" alt="Character" class="absolute w-24 h-24 object-contain">
+    <img id="gun" 
+    src="https://github.com/AkramHossain0/data/blob/main/g.png?raw=true" 
+    alt="Gun" 
+    class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-64 h-64 object-contain">
+
+    <div id="game-over" class="hidden absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <div class="bg-white p-8 rounded-lg text-center">
+        <h2 class="text-3xl font-bold mb-4">Game Over</h2>
+        <p id="final-score" class="text-xl mb-4">Your score: 0</p>
+        <button id="restart-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+          Play Again
+        </button>
+      </div>
     </div>
-    <script src="script.js"></script
-    score = 69; //
-scoreDisplay.innerText = "score: + score; 
-    gameOver = true; clearInterval(moveInterval);
-        clearInterval(pawMoveInterval);
-        "./dead.png"; mouse.classList.add("dead"); 
-        bgm.pause(); bgmt.play(); setTimeout(() => { victoryPopup.style.display = "block"; }, 500); 
-    
-        
+  </div>
+
+  <audio id="gunshot-sound" src="https://github.com/AkramHossain0/bongoboltu/raw/refs/heads/main/gun-shot-1-7069.mp3"></audio>
+
+  <script>
+    const gameContainer = document.getElementById('game-container');
+    const character = document.getElementById('character');
+    const gun = document.getElementById('gun');
+    const scoreElement = document.getElementById('score');
+    const timerElement = document.getElementById('timer');
+    const gameOverElement = document.getElementById('game-over');
+    const finalScoreElement = document.getElementById('final-score');
+    const restartBtn = document.getElementById('restart-btn');
+    const gunshotSound = document.getElementById('gunshot-sound');
+
+    let score = 0;
+    let timeLeft = 60;
+    let gameInterval;
+    let characterSpeed = 2;
+
+    function updateCharacterPosition() {
+      const maxX = gameContainer.clientWidth - character.clientWidth;
+      const maxY = gameContainer.clientHeight - character.clientHeight;
+      const newX = Math.random() * maxX;
+      const newY = Math.random() * maxY;
+      character.style.left = `${newX}px`;
+      character.style.top = `${newY}px`;
+    }
+
+    function updateScore() {
+      score++;
+      scoreElement.textContent = `Score: ${score}`;
+    }
+
+    function updateTimer() {
+      timeLeft--;
+      timerElement.textContent = `Time: ${timeLeft}s`;
+      if (timeLeft <= 0) {
+        endGame();
+      }
+    }
+
+    function createBullet(x, y, targetX, targetY) {
+      const bullet = document.createElement('div');
+      bullet.className = 'absolute w-2 h-2 bg-yellow-400 rounded-full';
+      bullet.style.left = `${x}px`;
+      bullet.style.top = `${y}px`;
+      gameContainer.appendChild(bullet);
+
+      const angle = Math.atan2(targetY - y, targetX - x);
+      const speed = 12;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+
+      function animateBullet() {
+        const currentX = parseFloat(bullet.style.left);
+        const currentY = parseFloat(bullet.style.top);
+        bullet.style.left = `${currentX + vx}px`;
+        bullet.style.top = `${currentY + vy}px`;
+
+        if (
+          currentX < 0 ||
+          currentX > gameContainer.clientWidth ||
+          currentY < 0 ||
+          currentY > gameContainer.clientHeight
+        ) {
+          gameContainer.removeChild(bullet);
+        } else {
+          requestAnimationFrame(animateBullet);
+        }
+
+        const characterRect = character.getBoundingClientRect();
+        const bulletRect = bullet.getBoundingClientRect();
+        if (
+          bulletRect.left < characterRect.right &&
+          bulletRect.right > characterRect.left &&
+          bulletRect.top < characterRect.bottom &&
+          bulletRect.bottom > characterRect.top
+        ) {
+          gameContainer.removeChild(bullet);
+          hitCharacter();
+        }
+      }
+
+      requestAnimationFrame(animateBullet);
+    }
+
+    function hitCharacter() {
+      character.classList.add('character-flash');
+      setTimeout(() => {
+        character.classList.remove('character-flash');
+      }, 200);
+
+      gunshotSound.currentTime = 0;
+      gunshotSound.play();
+
+      createBlastEffect(character.offsetLeft + character.clientWidth / 2, character.offsetTop + character.clientHeight / 2);
+      updateScore();
+      updateCharacterPosition();
+      characterSpeed += 0.1;
+    }
+
+    function createBlastEffect(x, y) {
+      const blast = document.createElement('div');
+      blast.className = 'absolute w-8 h-8 bg-red-500 rounded-full opacity-75';
+      blast.style.left = `${x - 16}px`;
+      blast.style.top = `${y - 16}px`;
+      gameContainer.appendChild(blast);
+
+      setTimeout(() => {
+        gameContainer.removeChild(blast);
+      }, 200);
+    }
+
+    function endGame() {
+      clearInterval(gameInterval);
+      gameOverElement.classList.remove('hidden');
+      finalScoreElement.textContent = `Your score: ${score}`;
+    }
+
+    function startGame() {
+      score = 0;
+      timeLeft = 60;
+      characterSpeed = 2;
+      scoreElement.textContent = 'Score: 0';
+      timerElement.textContent = 'Time: 60s';
+      gameOverElement.classList.add('hidden');
+
+      updateCharacterPosition();
+
+      gameInterval = setInterval(() => {
+        updateTimer();
+        updateCharacterPosition();
+      }, 1000);
+    }
+
+    gameContainer.addEventListener('click', (e) => {
+      const gunRect = gun.getBoundingClientRect();
+      const gunCenterX = gunRect.left + gunRect.width / 2;
+      const gunCenterY = gunRect.top + gunRect.height / 2;
+      createBullet(gunCenterX, gunCenterY, e.clientX, e.clientY);
+    });
+
+    restartBtn.addEventListener('click', startGame);
+
+    startGame();
+  </script>
 </body>
 </html>
